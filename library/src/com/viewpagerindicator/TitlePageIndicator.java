@@ -17,6 +17,7 @@
  */
 package com.viewpagerindicator;
 
+import java.util.ArrayList;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
@@ -29,14 +30,13 @@ import android.graphics.drawable.Drawable;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.v4.view.MotionEventCompat;
+import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewConfigurationCompat;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
-
-import java.util.ArrayList;
 
 /**
  * A TitlePageIndicator is a PageIndicator which displays the title of left view
@@ -95,27 +95,9 @@ public class TitlePageIndicator extends View implements PageIndicator {
         }
     }
 
-    public enum LinePosition {
-        Bottom(0), Top(1);
-
-        public final int value;
-
-        private LinePosition(int value) {
-            this.value = value;
-        }
-
-        public static LinePosition fromValue(int value) {
-            for (LinePosition position : LinePosition.values()) {
-                if (position.value == value) {
-                    return position;
-                }
-            }
-            return null;
-        }
-    }
-
     private ViewPager mViewPager;
     private ViewPager.OnPageChangeListener mListener;
+    private PagerAdapter mPagerAdapter;
     private int mCurrentPage = -1;
     private float mPageOffset;
     private int mScrollState;
@@ -127,13 +109,13 @@ public class TitlePageIndicator extends View implements PageIndicator {
     private final Rect mBounds = new Rect();
     private final Paint mPaintFooterLine = new Paint();
     private IndicatorStyle mFooterIndicatorStyle;
-    private LinePosition mLinePosition;
     private final Paint mPaintFooterIndicator = new Paint();
     private float mFooterIndicatorHeight;
     private float mFooterIndicatorUnderlinePadding;
     private float mFooterPadding;
     private float mTitlePadding;
     private float mTopPadding;
+    private float mIconPadding;
     /** Left and right side padding for not active view titles. */
     private float mClipPadding;
     private float mFooterLineHeight;
@@ -144,6 +126,7 @@ public class TitlePageIndicator extends View implements PageIndicator {
     private float mLastMotionX = -1;
     private int mActivePointerId = INVALID_POINTER;
     private boolean mIsDragging;
+    private boolean mWithIcons;
 
     private OnCenterItemClickListener mCenterItemClickListener;
 
@@ -168,7 +151,6 @@ public class TitlePageIndicator extends View implements PageIndicator {
         final float defaultFooterIndicatorHeight = res.getDimension(R.dimen.default_title_indicator_footer_indicator_height);
         final float defaultFooterIndicatorUnderlinePadding = res.getDimension(R.dimen.default_title_indicator_footer_indicator_underline_padding);
         final float defaultFooterPadding = res.getDimension(R.dimen.default_title_indicator_footer_padding);
-        final int defaultLinePosition = res.getInteger(R.integer.default_title_indicator_line_position);
         final int defaultSelectedColor = res.getColor(R.color.default_title_indicator_selected_color);
         final boolean defaultSelectedBold = res.getBoolean(R.bool.default_title_indicator_selected_bold);
         final int defaultTextColor = res.getColor(R.color.default_title_indicator_text_color);
@@ -176,6 +158,7 @@ public class TitlePageIndicator extends View implements PageIndicator {
         final float defaultTitlePadding = res.getDimension(R.dimen.default_title_indicator_title_padding);
         final float defaultClipPadding = res.getDimension(R.dimen.default_title_indicator_clip_padding);
         final float defaultTopPadding = res.getDimension(R.dimen.default_title_indicator_top_padding);
+        final float defaultIconPadding = res.getDimension(R.dimen.default_title_indicator_icon_padding);
 
         //Retrieve styles attributes
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.TitlePageIndicator, defStyle, 0);
@@ -186,8 +169,8 @@ public class TitlePageIndicator extends View implements PageIndicator {
         mFooterIndicatorHeight = a.getDimension(R.styleable.TitlePageIndicator_footerIndicatorHeight, defaultFooterIndicatorHeight);
         mFooterIndicatorUnderlinePadding = a.getDimension(R.styleable.TitlePageIndicator_footerIndicatorUnderlinePadding, defaultFooterIndicatorUnderlinePadding);
         mFooterPadding = a.getDimension(R.styleable.TitlePageIndicator_footerPadding, defaultFooterPadding);
-        mLinePosition = LinePosition.fromValue(a.getInteger(R.styleable.TitlePageIndicator_linePosition, defaultLinePosition));
         mTopPadding = a.getDimension(R.styleable.TitlePageIndicator_topPadding, defaultTopPadding);
+        mIconPadding = a.getDimension(R.styleable.TitlePageIndicator_iconPadding, defaultIconPadding);
         mTitlePadding = a.getDimension(R.styleable.TitlePageIndicator_titlePadding, defaultTitlePadding);
         mClipPadding = a.getDimension(R.styleable.TitlePageIndicator_clipPadding, defaultClipPadding);
         mColorSelected = a.getColor(R.styleable.TitlePageIndicator_selectedColor, defaultSelectedColor);
@@ -203,11 +186,6 @@ public class TitlePageIndicator extends View implements PageIndicator {
         mPaintFooterLine.setColor(footerColor);
         mPaintFooterIndicator.setStyle(Paint.Style.FILL_AND_STROKE);
         mPaintFooterIndicator.setColor(footerColor);
-
-        Drawable background = a.getDrawable(R.styleable.TitlePageIndicator_android_background);
-        if (background != null) {
-          setBackgroundDrawable(background);
-        }
 
         a.recycle();
 
@@ -260,15 +238,6 @@ public class TitlePageIndicator extends View implements PageIndicator {
 
     public void setFooterIndicatorStyle(IndicatorStyle indicatorStyle) {
         mFooterIndicatorStyle = indicatorStyle;
-        invalidate();
-    }
-
-    public LinePosition getLinePosition() {
-        return mLinePosition;
-    }
-
-    public void setLinePosition(LinePosition linePosition) {
-        mLinePosition = linePosition;
         invalidate();
     }
 
@@ -327,6 +296,15 @@ public class TitlePageIndicator extends View implements PageIndicator {
         invalidate();
     }
 
+    public float getIconPadding() {
+        return this.mIconPadding;
+    }
+
+    public void setIconPadding(float iconPadding) {
+        mIconPadding = iconPadding;
+        invalidate();
+    }
+
     public float getClipPadding() {
         return this.mClipPadding;
     }
@@ -363,9 +341,7 @@ public class TitlePageIndicator extends View implements PageIndicator {
         }
 
         // mCurrentPage is -1 on first start and after orientation changed. If so, retrieve the correct index from viewpager.
-        if (mCurrentPage == -1 && mViewPager != null) {
-            mCurrentPage = mViewPager.getCurrentItem();
-        }
+        if(mCurrentPage == -1 && mViewPager != null) mCurrentPage = mViewPager.getCurrentItem();
 
         //Calculate views bounds
         ArrayList<Rect> bounds = calculateAllBounds(mPaintText);
@@ -382,7 +358,7 @@ public class TitlePageIndicator extends View implements PageIndicator {
         final int left = getLeft();
         final float leftClip = left + mClipPadding;
         final int width = getWidth();
-        int height = getHeight();
+        final int height = getHeight();
         final int right = left + width;
         final float rightClip = right - mClipPadding;
 
@@ -458,6 +434,7 @@ public class TitlePageIndicator extends View implements PageIndicator {
             if ((bound.left > left && bound.left < right) || (bound.right > left && bound.right < right)) {
                 final boolean currentPage = (i == page);
                 final CharSequence pageTitle = getTitle(i);
+                final Drawable pageIcon = getIcon(i);
 
                 //Only set bold if we are within bounds
                 mPaintText.setFakeBoldText(currentPage && currentBold && mBoldText);
@@ -469,50 +446,42 @@ public class TitlePageIndicator extends View implements PageIndicator {
                     mPaintText.setAlpha(colorTextAlpha - (int)(colorTextAlpha * selectedPercent));
                 }
 
-                //Except if there's an intersection with the right view
-                if (i < boundsSize - 1)  {
-                    Rect rightBound = bounds.get(i + 1);
-                    //Intersection
-                    if (bound.right + mTitlePadding > rightBound.left) {
-                        int w = bound.right - bound.left;
-                        bound.left = (int) (rightBound.left - w - mTitlePadding);
-                        bound.right = bound.left + w;
-                    }
+                float iconOffset = 0;
+                if (pageIcon != null) {
+                    Rect iconBounds = pageIcon.getBounds();
+                    pageIcon.setAlpha(mPaintText.getAlpha());
+                    iconBounds.offset(bound.left, 5);
+                    pageIcon.draw(canvas);
+                    iconOffset = iconBounds.width() + mIconPadding;
                 }
-                canvas.drawText(pageTitle, 0, pageTitle.length(), bound.left, bound.bottom + mTopPadding, mPaintText);
+                canvas.drawText(pageTitle, 0, pageTitle.length(), bound.left + iconOffset, bound.bottom + mTopPadding, mPaintText);
 
                 //If we are within the selected bounds draw the selected text
                 if (currentPage && currentSelected) {
                     mPaintText.setColor(mColorSelected);
                     mPaintText.setAlpha((int)((mColorSelected >>> 24) * selectedPercent));
-                    canvas.drawText(pageTitle, 0, pageTitle.length(), bound.left, bound.bottom + mTopPadding, mPaintText);
+                    if (pageIcon != null) {
+                        pageIcon.setAlpha(mPaintText.getAlpha());
+                        pageIcon.draw(canvas);
+                    }
+                    canvas.drawText(pageTitle, 0, pageTitle.length(), bound.left + iconOffset, bound.bottom + mTopPadding, mPaintText);
                 }
             }
         }
 
-        //If we want the line on the top change height to zero and invert the line height to trick the drawing code
-        float footerLineHeight = mFooterLineHeight;
-        float footerIndicatorLineHeight = mFooterIndicatorHeight;
-        if (mLinePosition == LinePosition.Top) {
-            height = 0;
-            footerLineHeight = -footerLineHeight;
-            footerIndicatorLineHeight = -footerIndicatorLineHeight;
-        }
-
         //Draw the footer line
         mPath.reset();
-        mPath.moveTo(0, height - footerLineHeight / 2f);
-        mPath.lineTo(width, height - footerLineHeight / 2f);
+        mPath.moveTo(0, height - mFooterLineHeight / 2f);
+        mPath.lineTo(width, height - mFooterLineHeight / 2f);
         mPath.close();
         canvas.drawPath(mPath, mPaintFooterLine);
 
-        float heightMinusLine = height - footerLineHeight;
         switch (mFooterIndicatorStyle) {
             case Triangle:
                 mPath.reset();
-                mPath.moveTo(halfWidth, heightMinusLine - footerIndicatorLineHeight);
-                mPath.lineTo(halfWidth + footerIndicatorLineHeight, heightMinusLine);
-                mPath.lineTo(halfWidth - footerIndicatorLineHeight, heightMinusLine);
+                mPath.moveTo(halfWidth, height - mFooterLineHeight - mFooterIndicatorHeight);
+                mPath.lineTo(halfWidth + mFooterIndicatorHeight, height - mFooterLineHeight);
+                mPath.lineTo(halfWidth - mFooterIndicatorHeight, height - mFooterLineHeight);
                 mPath.close();
                 canvas.drawPath(mPath, mPaintFooterIndicator);
                 break;
@@ -523,15 +492,11 @@ public class TitlePageIndicator extends View implements PageIndicator {
                 }
 
                 Rect underlineBounds = bounds.get(page);
-                final float rightPlusPadding = underlineBounds.right + mFooterIndicatorUnderlinePadding;
-                final float leftMinusPadding = underlineBounds.left - mFooterIndicatorUnderlinePadding;
-                final float heightMinusLineMinusIndicator = heightMinusLine - footerIndicatorLineHeight;
-
                 mPath.reset();
-                mPath.moveTo(leftMinusPadding, heightMinusLine);
-                mPath.lineTo(rightPlusPadding, heightMinusLine);
-                mPath.lineTo(rightPlusPadding, heightMinusLineMinusIndicator);
-                mPath.lineTo(leftMinusPadding, heightMinusLineMinusIndicator);
+                mPath.moveTo(underlineBounds.left  - mFooterIndicatorUnderlinePadding, height - mFooterLineHeight);
+                mPath.lineTo(underlineBounds.right + mFooterIndicatorUnderlinePadding, height - mFooterLineHeight);
+                mPath.lineTo(underlineBounds.right + mFooterIndicatorUnderlinePadding, height - mFooterLineHeight - mFooterIndicatorHeight);
+                mPath.lineTo(underlineBounds.left  - mFooterIndicatorUnderlinePadding, height - mFooterLineHeight - mFooterIndicatorHeight);
                 mPath.close();
 
                 mPaintFooterIndicator.setAlpha((int)(0xFF * selectedPercent));
@@ -549,8 +514,9 @@ public class TitlePageIndicator extends View implements PageIndicator {
             return false;
         }
 
-        final int action = ev.getAction() & MotionEventCompat.ACTION_MASK;
-        switch (action) {
+        final int action = ev.getAction();
+
+        switch (action & MotionEventCompat.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN:
                 mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
                 mLastMotionX = ev.getX();
@@ -590,21 +556,17 @@ public class TitlePageIndicator extends View implements PageIndicator {
 
                     if (eventX < leftThird) {
                         if (mCurrentPage > 0) {
-                            if (action != MotionEvent.ACTION_CANCEL) {
-                                mViewPager.setCurrentItem(mCurrentPage - 1);
-                            }
+                            mViewPager.setCurrentItem(mCurrentPage - 1);
                             return true;
                         }
                     } else if (eventX > rightThird) {
                         if (mCurrentPage < count - 1) {
-                            if (action != MotionEvent.ACTION_CANCEL) {
-                                mViewPager.setCurrentItem(mCurrentPage + 1);
-                            }
+                            mViewPager.setCurrentItem(mCurrentPage + 1);
                             return true;
                         }
                     } else {
                         //Middle third
-                        if (mCenterItemClickListener != null && action != MotionEvent.ACTION_CANCEL) {
+                        if (mCenterItemClickListener != null) {
                             mCenterItemClickListener.onCenterItemClick(mCurrentPage);
                         }
                     }
@@ -617,7 +579,8 @@ public class TitlePageIndicator extends View implements PageIndicator {
 
             case MotionEventCompat.ACTION_POINTER_DOWN: {
                 final int index = MotionEventCompat.getActionIndex(ev);
-                mLastMotionX = MotionEventCompat.getX(ev, index);
+                final float x = MotionEventCompat.getX(ev, index);
+                mLastMotionX = x;
                 mActivePointerId = MotionEventCompat.getPointerId(ev, index);
                 break;
             }
@@ -634,7 +597,7 @@ public class TitlePageIndicator extends View implements PageIndicator {
         }
 
         return true;
-    }
+    };
 
     /**
      * Set bounds for the right textView including clip padding.
@@ -701,7 +664,42 @@ public class TitlePageIndicator extends View implements PageIndicator {
         CharSequence title = getTitle(index);
         bounds.right = (int) paint.measureText(title, 0, title.length());
         bounds.bottom = (int) (paint.descent() - paint.ascent());
+
+        Drawable icon = getIcon(index);
+        if (icon != null) {
+            Rect iconBounds = icon.getBounds();
+            bounds.right += iconBounds.width() + mIconPadding;
+        }
+
         return bounds;
+    }
+
+    /**
+     * Fetches the icon at index if it exists
+     * @param index
+     * @return
+     */
+    private Drawable getIcon(int index) {
+        if(!mWithIcons) {
+            return null;
+        }
+
+        int iconId = ((IconProvider) mPagerAdapter).getIcon(index);
+        if (iconId == IconProvider.NO_ICON) {
+            return null;
+        }
+
+        Drawable drawable = getContext().getResources().getDrawable(iconId);
+
+        float height = getHeight() - mTopPadding - mFooterPadding;
+        float scaleFactor = height / drawable.getIntrinsicHeight();
+
+        Rect bounds = new Rect();
+        bounds.right = (int) (drawable.getIntrinsicWidth() * scaleFactor);
+        bounds.top = (int) mTopPadding;
+        bounds.bottom = (int) (getHeight() - mFooterPadding);
+        drawable.setBounds(bounds);
+        return drawable;
     }
 
     @Override
@@ -712,11 +710,13 @@ public class TitlePageIndicator extends View implements PageIndicator {
         if (mViewPager != null) {
             mViewPager.setOnPageChangeListener(null);
         }
-        if (view.getAdapter() == null) {
+        mPagerAdapter = view.getAdapter();
+        if (mPagerAdapter == null) {
             throw new IllegalStateException("ViewPager does not have adapter instance.");
         }
         mViewPager = view;
         mViewPager.setOnPageChangeListener(this);
+        mWithIcons = (mPagerAdapter instanceof IconProvider);
         invalidate();
     }
 
@@ -793,7 +793,7 @@ public class TitlePageIndicator extends View implements PageIndicator {
         final int measuredWidth = MeasureSpec.getSize(widthMeasureSpec);
 
         //Determine our height
-        float height;
+        float height = 0;
         final int heightSpecMode = MeasureSpec.getMode(heightMeasureSpec);
         if (heightSpecMode == MeasureSpec.EXACTLY) {
             //We were told how big to be
@@ -846,7 +846,6 @@ public class TitlePageIndicator extends View implements PageIndicator {
             dest.writeInt(currentPage);
         }
 
-        @SuppressWarnings("UnusedDeclaration")
         public static final Parcelable.Creator<SavedState> CREATOR = new Parcelable.Creator<SavedState>() {
             @Override
             public SavedState createFromParcel(Parcel in) {
@@ -861,10 +860,10 @@ public class TitlePageIndicator extends View implements PageIndicator {
     }
 
     private CharSequence getTitle(int i) {
-        CharSequence title = mViewPager.getAdapter().getPageTitle(i);
+        CharSequence title = mPagerAdapter.getPageTitle(i);
         if (title == null) {
             title = EMPTY_TITLE;
         }
-        return title;
+        return title.toString();
     }
 }
