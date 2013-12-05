@@ -514,9 +514,8 @@ public class TitlePageIndicator extends View implements PageIndicator {
 			return false;
 		}
 
-		final int action = ev.getAction();
-
-		switch (action & MotionEventCompat.ACTION_MASK) {
+		final int action = ev.getAction() & MotionEventCompat.ACTION_MASK;
+		switch (action) {
 		case MotionEvent.ACTION_DOWN:
 			mActivePointerId = MotionEventCompat.getPointerId(ev, 0);
 			mLastMotionX = ev.getX();
@@ -556,20 +555,24 @@ public class TitlePageIndicator extends View implements PageIndicator {
 
 				if (eventX < leftThird) {
 					if (mCurrentPage > 0) {
-						mViewPager.setCurrentItem(mCurrentPage - 1);
+						if (action != MotionEvent.ACTION_CANCEL) {
+							mViewPager.setCurrentItem(mCurrentPage - 1);
+						}
 						return true;
 					}
 				}
 				else
 					if (eventX > rightThird) {
 						if (mCurrentPage < count - 1) {
-							mViewPager.setCurrentItem(mCurrentPage + 1);
+							if (action != MotionEvent.ACTION_CANCEL) {
+								mViewPager.setCurrentItem(mCurrentPage + 1);
+							}
 							return true;
 						}
 					}
 					else {
 						// Middle third
-						if (mCenterItemClickListener != null) {
+						if (mCenterItemClickListener != null && action != MotionEvent.ACTION_CANCEL) {
 							mCenterItemClickListener.onCenterItemClick(mCurrentPage);
 						}
 					}
